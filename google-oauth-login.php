@@ -15,6 +15,13 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
+if (!file_exists(__DIR__ . '/vendor/autoload.php')) {
+    add_action('admin_notices', function () {
+        echo '<div class="error"><p><strong>Google OAuth Login:</strong> The required Composer dependencies are missing. Please run <code>composer install</code> in the plugin directory.</p></div>';
+    });
+    return;
+}
+
 // Chargement de l'autoloader de Composer
 require_once plugin_dir_path(__FILE__) . 'vendor/autoload.php';
 
@@ -248,5 +255,5 @@ function render_settings_page()
     </div>
 
 <?php
-
 }
+
