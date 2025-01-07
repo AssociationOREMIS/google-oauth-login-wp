@@ -1,0 +1,102 @@
+/* Container principal */
+.wrap {
+    max-width: 800px;
+    margin: 20px auto;
+    background-color: #ffffff;
+    padding: 20px 30px;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    box-shadow: 0px 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+/* Titre */
+.wrap h2 {
+    font-size: 24px;
+    margin-bottom: 20px;
+    color: #333333;
+    font-weight: 600;
+    text-align: center;
+}
+
+/* Table de formulaire */
+.wrap .form-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 20px;
+}
+
+.wrap .form-table th {
+    font-size: 16px;
+    text-align: left;
+    padding: 10px 15px;
+    color: #555555;
+    width: 200px;
+    vertical-align: middle;
+}
+
+.wrap .form-table td {
+    vertical-align: middle;
+}
+
+.wrap .form-table input[type="text"],
+.wrap .form-table input[type="password"] {
+    width: calc(100% - 30px);
+    padding: 10px;
+    font-size: 14px;
+    border: 1px solid #d0d0d0;
+    border-radius: 4px;
+    box-shadow: inset 0px 1px 3px rgba(0, 0, 0, 0.05);
+    transition: border-color 0.2s ease-in-out;
+}
+
+.wrap .form-table input[type="text"]:focus,
+.wrap .form-table input[type="password"]:focus {
+    border-color: #007cba;
+    outline: none;
+}
+
+/* Bouton principal */
+.wrap .form-table button,
+.wrap .form-table input[type="submit"] {
+    background-color: #007cba;
+    color: #ffffff;
+    border: none;
+    padding: 10px 20px;
+    font-size: 16px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background-color 0.3s ease-in-out, box-shadow 0.2s;
+}
+
+.wrap .form-table button:hover,
+.wrap .form-table input[type="submit"]:hover {
+    background-color: #005a8c;
+    box-shadow: 0px 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+/* Bouton afficher/masquer */
+#toggle-secret {
+    background-color: #f5f5f5;
+    color: #333333;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    padding: 5px 10px;
+    font-size: 14px;
+    cursor: pointer;
+    transition: background-color 0.3s ease-in-out;
+}
+
+#toggle-secret:hover {
+    background-color: #e6e6e6;
+    border-color: #bbb;
+}
+
+/* Messages de notification */
+.notice {
+    margin: 15px 0;
+    padding: 10px;
+    border-left: 4px solid #007cba;
+    background-color: #f1faff;
+    color: #007cba;
+    border-radius: 4px;
+}

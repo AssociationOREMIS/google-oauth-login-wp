@@ -1,0 +1,21 @@
+{
+    "name": "orenis/google-oauth-login",
+    "description": "Plugin WordPress pour l'authentification avec Google OAuth.",
+    "type": "project",
+    "require": {
+        "google/apiclient": "^2.18"
+    },
+    "autoload": {
+        "psr-4": {
+            "GoogleOAuthLogin\\": "src/"
+        }
+    },
+    "authors": [
+        {
+            "name": "Lucas VOLET",
+            "email": "lucas.volet@orenis.fr"
+        }
+    ],
+    "minimum-stability": "stable",
+    "license": "GPL-2.0-or-later"
+}
