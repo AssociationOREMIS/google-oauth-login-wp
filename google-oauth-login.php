@@ -8,6 +8,9 @@
  * Author: Lucas VOLET
  * Author URI: https://oremis.fr
  * License: GPL-2.0+
+ * Requires at least: 5.5
+ * Tested up to: 6.3
+ * Requires PHP: 7.4
  */
 
 if (!defined('ABSPATH')) {
