@@ -3,7 +3,7 @@
  * Plugin Name: Google OAuth Login Standalone
  * Plugin URI: https://oremis.fr
  * Description: Permet aux utilisateurs de se connecter avec leur compte Google (sans dépendances)
- * Version: 1.0.2
+ * Version: 1.0.3
  * Author: Lucas VOLET
  * Author URI: https://oremis.fr
  * License: GPL-2.0+
