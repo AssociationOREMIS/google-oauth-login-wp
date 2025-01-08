@@ -4,7 +4,7 @@
  * Plugin Name: Google OAuth Login Standalone (OREMIS)
  * Plugin URI: https://oremis.fr
  * Description: Permet aux bénévoles de l'association OREMIS de se connecter avec leur compte Google
- * Version: 1.0.6
+ * Version: 1.1.0
  * Author: Lucas VOLET
  * Author URI: https://oremis.fr
  * License: GPL-2.0+
