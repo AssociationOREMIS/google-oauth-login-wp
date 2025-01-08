@@ -289,12 +289,65 @@ function render_settings_page()
 }
 
 class GoogleOAuthUpdater {
-    private $repository = 'AssociationOREMIS/google-oauth-login-wp'; // Nom du dépôt
-    private $access_token = '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'; // Votre token
+    private $plugin_slug;
+    private $plugin_file;
+    private $repository;
+    private $github_api_url;
+    private $transient_key;
+    private $cache_expiration = 12 * HOUR_IN_SECONDS;
 
     public function __construct() {
+        $this->plugin_slug = 'google-oauth-login-wp';
+        $this->plugin_file = plugin_basename(__FILE__);
+        $this->repository = 'AssociationOREMIS/google-oauth-login-wp';
+        $this->github_api_url = "https://api.github.com/repos/{$this->repository}";
+        $this->transient_key = 'google_oauth_github_api_cache';
+
+        // Hooks for update mechanism
         add_filter('pre_set_site_transient_update_plugins', [$this, 'check_for_update']);
         add_filter('plugins_api', [$this, 'plugin_info'], 20, 3);
+        add_action('upgrader_process_complete', [$this, 'purge_update_cache'], 10, 2);
+    }
+
+    private function get_plugin_data() {
+        if (!function_exists('get_plugin_data')) {
+            require_once(ABSPATH . 'wp-admin/includes/plugin.php');
+        }
+        return get_plugin_data(__FILE__);
+    }
+
+    private function get_github_data() {
+        $cached_data = get_transient($this->transient_key);
+        if ($cached_data !== false) {
+            return $cached_data;
+        }
+
+        $github_token = defined('GITHUB_OAUTH_TOKEN') ? GITHUB_OAUTH_TOKEN : '';
+        
+        $args = [
+            'headers' => [
+                'Accept' => 'application/vnd.github.v3+json',
+            ],
+            'timeout' => 15,
+        ];
+
+        if (!empty($github_token)) {
+            $args['headers']['Authorization'] = 'Bearer ' . $github_token;
+        }
+
+        $response = wp_remote_get($this->github_api_url . '/releases/latest', $args);
+
+        if (is_wp_error($response) || wp_remote_retrieve_response_code($response) !== 200) {
+            return false;
+        }
+
+        $data = json_decode(wp_remote_retrieve_body($response), true);
+        if (empty($data)) {
+            return false;
+        }
+
+        set_transient($this->transient_key, $data, $this->cache_expiration);
+        return $data;
     }
 
     public function check_for_update($transient) {
@@ -302,67 +355,85 @@ class GoogleOAuthUpdater {
             return $transient;
         }
 
-        $plugin_data = get_plugin_data(__FILE__);
+        $plugin_data = $this->get_plugin_data();
         $current_version = $plugin_data['Version'];
+        $github_data = $this->get_github_data();
 
-        // Appel à l'API GitHub pour récupérer la dernière release
-        $response = wp_remote_get("https://api.github.com/repos/{$this->repository}/releases/latest", [
-            'headers' => [
-                'Authorization' => 'Bearer ' . $this->access_token,
-            ],
-        ]);
+        if ($github_data && isset($github_data['tag_name'])) {
+            $new_version = ltrim($github_data['tag_name'], 'v');
+            
+            if (version_compare($new_version, $current_version, '>')) {
+                $plugin_details = (object) [
+                    'slug' => $this->plugin_slug,
+                    'new_version' => $new_version,
+                    'url' => $github_data['html_url'],
+                    'package' => $github_data['zipball_url'],
+                    'tested' => $plugin_data['Tested up to'] ?? '',
+                    'requires' => $plugin_data['Requires at least'] ?? '',
+                    'requires_php' => $plugin_data['Requires PHP'] ?? '',
+                ];
 
-        if (is_wp_error($response)) {
-            return $transient;
-        }
-
-        $release = json_decode(wp_remote_retrieve_body($response), true);
-
-        if (isset($release['tag_name']) && version_compare($release['tag_name'], $current_version, '>')) {
-            $transient->response['google-oauth-login-wp/google-oauth-login.php'] = (object)[
-                'slug' => 'google-oauth-login-wp',
-                'new_version' => $release['tag_name'],
-                'url' => $release['html_url'], // Lien vers la page de la release sur GitHub
-                'package' => $release['zipball_url'], // Lien direct vers le ZIP
-            ];
+                $transient->response[$this->plugin_file] = $plugin_details;
+            }
         }
 
         return $transient;
     }
 
     public function plugin_info($result, $action, $args) {
-        if ($action !== 'plugin_information' || $args->slug !== 'google-oauth-login-wp') {
+        if ($action !== 'plugin_information' || ($args->slug ?? '') !== $this->plugin_slug) {
             return $result;
         }
 
-        $response = wp_remote_get("https://api.github.com/repos/{$this->repository}/releases/latest", [
-            'headers' => [
-                'Authorization' => 'Bearer ' . $this->access_token,
-            ],
-        ]);
+        $github_data = $this->get_github_data();
+        $plugin_data = $this->get_plugin_data();
 
-        if (is_wp_error($response)) {
+        if (!$github_data) {
             return $result;
         }
 
-        $release = json_decode(wp_remote_retrieve_body($response), true);
-
-        return (object)[
-            'name' => 'Google OAuth Login',
-            'slug' => 'google-oauth-login-wp',
-            'version' => $release['tag_name'],
-            'author' => '<a href="https://oremis.fr">Association OREMIS</a>',
-            'homepage' => 'https://oremis.fr',
-            'download_link' => $release['zipball_url'],
-            'requires' => '5.0',
-            'tested' => '6.3',
-            'requires_php' => '7.4',
+        return (object) [
+            'name' => $plugin_data['Name'],
+            'slug' => $this->plugin_slug,
+            'version' => ltrim($github_data['tag_name'], 'v'),
+            'author' => $plugin_data['Author'],
+            'author_profile' => $plugin_data['AuthorURI'],
+            'homepage' => $plugin_data['PluginURI'],
+            'requires' => $plugin_data['RequiresWP'] ?? '5.0',
+            'tested' => $plugin_data['Tested up to'] ?? '',
+            'requires_php' => $plugin_data['RequiresPHP'] ?? '7.4',
+            'downloaded' => 0,
+            'last_updated' => $github_data['published_at'],
             'sections' => [
-                'description' => 'Plugin pour permettre la connexion via Google.',
+                'description' => $plugin_data['Description'],
+                'changelog' => $this->get_changelog($github_data),
             ],
+            'download_link' => $github_data['zipball_url'],
         ];
     }
+
+    private function get_changelog($github_data) {
+        $changelog = "= {$github_data['tag_name']} =\n";
+        $changelog .= "Released: " . date('Y-m-d', strtotime($github_data['published_at'])) . "\n\n";
+        $changelog .= $github_data['body'] ?? 'No changelog provided.';
+        return $changelog;
+    }
+
+    public function purge_update_cache($upgrader_object, $options) {
+        if (
+            $options['action'] === 'update' && 
+            $options['type'] === 'plugin' && 
+            isset($options['plugins'])
+        ) {
+            if (in_array($this->plugin_file, $options['plugins'])) {
+                delete_transient($this->transient_key);
+            }
+        }
+    }
+  
 }
 
-// Initialisation de la classe
-new GoogleOAuthUpdater();
+add_action('plugins_loaded', function() {
+    global $updater;
+    $updater = new GoogleOAuthUpdater();
+});
