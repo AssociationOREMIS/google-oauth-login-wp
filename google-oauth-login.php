@@ -346,19 +346,13 @@ class GoogleOAuthUpdater
             return $cached_data;
         }
 
-        $github_token = defined('GITHUB_OAUTH_TOKEN') ? GITHUB_OAUTH_TOKEN : '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';
-
         $args = [
             'headers' => [
                 'Accept' => 'application/vnd.github.v3+json',
-                'Authorization' => 'Bearer ' . $github_token,
             ],
             'timeout' => 15,
         ];
 
-        if (!empty($github_token)) {
-            $args['headers']['Authorization'] = 'Bearer ' . $github_token;
-        }
 
         $response = wp_remote_get($this->github_api_url . '/releases/latest', $args);
 
