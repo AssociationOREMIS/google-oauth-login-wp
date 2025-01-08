@@ -1,119 +1,148 @@
 <?php
-
 /**
- * Plugin Name: Google OAuth Login
+ * Plugin Name: Google OAuth Login Standalone
  * Plugin URI: https://oremis.fr
- * Description: Permet aux utilisateurs de se connecter avec leur compte Google
- * Version: 1.0.0
+ * Description: Permet aux utilisateurs de se connecter avec leur compte Google (sans dépendances)
+ * Version: 1.0.1
  * Author: Lucas VOLET
  * Author URI: https://oremis.fr
  * License: GPL-2.0+
  */
 
-// Empêcher l'accès direct au fichier
 if (!defined('ABSPATH')) {
     exit;
 }
 
-if (!file_exists(__DIR__ . '/vendor/autoload.php')) {
-    add_action('admin_notices', function () {
-        echo '<div class="error"><p><strong>Google OAuth Login:</strong> The required Composer dependencies are missing. Please run <code>composer install</code> in the plugin directory.</p></div>';
-    });
-    return;
-}
+class GoogleOAuthLoginStandalone {
+    private $client_id;
+    private $client_secret;
+    private $redirect_uri;
 
-// Chargement de l'autoloader de Composer
-require_once plugin_dir_path(__FILE__) . 'vendor/autoload.php';
-
-use Google\Client;
-use Google\Service\Oauth2;
-
-class GoogleOAuthLogin
-{
-    private $client;
-
-    public function __construct()
-    {
-        add_action('init', [$this, 'init_google_client']);
+    public function __construct() {
+        add_action('init', [$this, 'init_oauth']);
         add_action('login_enqueue_scripts', [$this, 'enqueue_styles']);
         add_action('login_form', [$this, 'add_google_login_button']);
         add_action('wp_ajax_nopriv_google_oauth_callback', [$this, 'handle_oauth_callback']);
         add_action('wp_ajax_google_oauth_callback', [$this, 'handle_oauth_callback']);
     }
 
-    public function init_google_client()
-    {
-        $this->client = new Client();
-        $this->client->setClientId(get_option('google_oauth_client_id'));
-        $this->client->setClientSecret(get_option('google_oauth_client_secret'));
-        // Utiliser l'URL AJAX de WordPress
-        $this->client->setRedirectUri(admin_url('admin-ajax.php?action=google_oauth_callback'));
-        $this->client->addScope('email');
-        $this->client->addScope('profile');
+    public function init_oauth() {
+        $this->client_id = get_option('google_oauth_client_id');
+        $this->client_secret = get_option('google_oauth_client_secret');
+        $this->redirect_uri = admin_url('admin-ajax.php?action=google_oauth_callback');
     }
 
-    public function enqueue_styles()
-    {
+    public function create_auth_url() {
+        $params = [
+            'client_id' => $this->client_id,
+            'redirect_uri' => $this->redirect_uri,
+            'response_type' => 'code',
+            'scope' => 'email profile',
+            'access_type' => 'online',
+            'prompt' => 'select_account'
+        ];
+
+        return 'https://accounts.google.com/o/oauth2/v2/auth?' . http_build_query($params);
+    }
+
+    private function get_token($code) {
+        $response = wp_remote_post('https://oauth2.googleapis.com/token', [
+            'body' => [
+                'code' => $code,
+                'client_id' => $this->client_id,
+                'client_secret' => $this->client_secret,
+                'redirect_uri' => $this->redirect_uri,
+                'grant_type' => 'authorization_code'
+            ]
+        ]);
+
+        if (is_wp_error($response)) {
+            throw new Exception('Erreur lors de la récupération du token');
+        }
+
+        $body = json_decode(wp_remote_retrieve_body($response), true);
+
+        if (!isset($body['access_token'])) {
+            throw new Exception('Token invalide');
+        }
+
+        return $body['access_token'];
+    }
+
+    private function get_user_info($access_token) {
+        $response = wp_remote_get('https://www.googleapis.com/oauth2/v3/userinfo', [
+            'headers' => [
+                'Authorization' => 'Bearer ' . $access_token
+            ]
+        ]);
+
+        if (is_wp_error($response)) {
+            throw new Exception('Erreur lors de la récupération des informations utilisateur');
+        }
+
+        return json_decode(wp_remote_retrieve_body($response), true);
+    }
+
+    public function enqueue_styles() {
         wp_enqueue_style(
             'google-oauth-style',
             plugin_dir_url(__FILE__) . 'assets/css/style.css',
             [],
-            time() // Utilisation d'un timestamp pour éviter le cache
+            time()
         );
     }
 
-    public function add_google_login_button()
-    {
-        $auth_url = $this->client->createAuthUrl();
-?>
+    public function add_google_login_button() {
+        $auth_url = $this->create_auth_url();
+        ?>
         <div class="google-login-container">
             <a href="<?php echo esc_url($auth_url); ?>" class="google-login-button">
                 <img src="<?php echo plugin_dir_url(__FILE__) . 'assets/images/google-icon.svg'; ?>" alt="Google Icon">
                 Se connecter avec Google
             </a>
         </div>
-    <?php
+        <?php
     }
 
-
-    public function handle_oauth_callback()
-    {
+    public function handle_oauth_callback() {
         if (!isset($_GET['code'])) {
             wp_redirect(wp_login_url());
             exit;
         }
 
         try {
-            $token = $this->client->fetchAccessTokenWithAuthCode($_GET['code']);
-            $this->client->setAccessToken($token);
+            $access_token = $this->get_token($_GET['code']);
+            $user_info = $this->get_user_info($access_token);
 
-            $google_oauth = new Oauth2($this->client);
-            $google_user_info = $google_oauth->userinfo->get();
+            if (!isset($user_info['email'])) {
+                throw new Exception('Email non trouvé');
+            }
 
-            $email = $google_user_info->getEmail();
-            $name = $google_user_info->getName();
+            $email = $user_info['email'];
+            $name = $user_info['name'] ?? '';
+            $given_name = $user_info['given_name'] ?? '';
+            $family_name = $user_info['family_name'] ?? '';
 
-            // Vérifier si l'utilisateur existe déjà
+            // Vérifier si l'utilisateur existe
             $user = get_user_by('email', $email);
 
             if (!$user) {
                 // Créer un nouvel utilisateur
                 $username = $this->generate_username($email);
                 $random_password = wp_generate_password();
-
+                
                 $user_id = wp_create_user($username, $random_password, $email);
-
+                
                 if (is_wp_error($user_id)) {
-                    wp_redirect(wp_login_url() . '?login=failed');
-                    exit;
+                    throw new Exception('Erreur lors de la création de l\'utilisateur');
                 }
 
-                // Mettre à jour les informations de l'utilisateur
+                // Mettre à jour les informations
                 wp_update_user([
                     'ID' => $user_id,
                     'display_name' => $name,
-                    'first_name' => $google_user_info->getGivenName(),
-                    'last_name' => $google_user_info->getFamilyName()
+                    'first_name' => $given_name,
+                    'last_name' => $family_name
                 ]);
 
                 $user = get_user_by('ID', $user_id);
@@ -126,14 +155,14 @@ class GoogleOAuthLogin
 
             wp_redirect(admin_url());
             exit;
+
         } catch (Exception $e) {
             wp_redirect(wp_login_url() . '?login=failed');
             exit;
         }
     }
 
-    private function generate_username($email)
-    {
+    private function generate_username($email) {
         $username = substr($email, 0, strpos($email, '@'));
         $base_username = $username;
         $counter = 1;
@@ -148,12 +177,12 @@ class GoogleOAuthLogin
 }
 
 // Initialisation du plugin
-add_action('plugins_loaded', function () {
-    new GoogleOAuthLogin();
+add_action('plugins_loaded', function() {
+    new GoogleOAuthLoginStandalone();
 });
 
-// Ajout du menu d'administration
-add_action('admin_menu', function () {
+// Partie administration (identique à votre version)
+add_action('admin_menu', function() {
     add_options_page(
         'Paramètres Google OAuth',
         'Google OAuth (OREMIS)',
@@ -162,6 +191,8 @@ add_action('admin_menu', function () {
         'render_settings_page'
     );
 });
+
+// Les fonctions render_settings_page() et autres restent identiques...
 
 function google_oauth_enqueue_admin_scripts($hook)
 {
