@@ -3,7 +3,7 @@
  * Plugin Name: Google OAuth Login Standalone
  * Plugin URI: https://oremis.fr
  * Description: Permet aux utilisateurs de se connecter avec leur compte Google (sans dépendances)
- * Version: 1.0.1
+ * Version: 1.0.2
  * Author: Lucas VOLET
  * Author URI: https://oremis.fr
  * License: GPL-2.0+
@@ -288,3 +288,81 @@ function render_settings_page()
 <?php
 }
 
+class GoogleOAuthUpdater {
+    private $repository = 'AssociationOREMIS/google-oauth-login-wp'; // Nom du dépôt
+    private $access_token = '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'; // Votre token
+
+    public function __construct() {
+        add_filter('pre_set_site_transient_update_plugins', [$this, 'check_for_update']);
+        add_filter('plugins_api', [$this, 'plugin_info'], 20, 3);
+    }
+
+    public function check_for_update($transient) {
+        if (empty($transient->checked)) {
+            return $transient;
+        }
+
+        $plugin_data = get_plugin_data(__FILE__);
+        $current_version = $plugin_data['Version'];
+
+        // Appel à l'API GitHub pour récupérer la dernière release
+        $response = wp_remote_get("https://api.github.com/repos/{$this->repository}/releases/latest", [
+            'headers' => [
+                'Authorization' => 'Bearer ' . $this->access_token,
+            ],
+        ]);
+
+        if (is_wp_error($response)) {
+            return $transient;
+        }
+
+        $release = json_decode(wp_remote_retrieve_body($response), true);
+
+        if (isset($release['tag_name']) && version_compare($release['tag_name'], $current_version, '>')) {
+            $transient->response['google-oauth-login-wp/google-oauth-login.php'] = (object)[
+                'slug' => 'google-oauth-login-wp',
+                'new_version' => $release['tag_name'],
+                'url' => $release['html_url'], // Lien vers la page de la release sur GitHub
+                'package' => $release['zipball_url'], // Lien direct vers le ZIP
+            ];
+        }
+
+        return $transient;
+    }
+
+    public function plugin_info($result, $action, $args) {
+        if ($action !== 'plugin_information' || $args->slug !== 'google-oauth-login-wp') {
+            return $result;
+        }
+
+        $response = wp_remote_get("https://api.github.com/repos/{$this->repository}/releases/latest", [
+            'headers' => [
+                'Authorization' => 'Bearer ' . $this->access_token,
+            ],
+        ]);
+
+        if (is_wp_error($response)) {
+            return $result;
+        }
+
+        $release = json_decode(wp_remote_retrieve_body($response), true);
+
+        return (object)[
+            'name' => 'Google OAuth Login',
+            'slug' => 'google-oauth-login-wp',
+            'version' => $release['tag_name'],
+            'author' => '<a href="https://oremis.fr">Association OREMIS</a>',
+            'homepage' => 'https://oremis.fr',
+            'download_link' => $release['zipball_url'],
+            'requires' => '5.0',
+            'tested' => '6.3',
+            'requires_php' => '7.4',
+            'sections' => [
+                'description' => 'Plugin pour permettre la connexion via Google.',
+            ],
+        ];
+    }
+}
+
+// Initialisation de la classe
+new GoogleOAuthUpdater();
