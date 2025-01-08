@@ -351,6 +351,7 @@ class GoogleOAuthUpdater
         $args = [
             'headers' => [
                 'Accept' => 'application/vnd.github.v3+json',
+                'Authorization' => 'Bearer ' . $github_token,
             ],
             'timeout' => 15,
         ];
