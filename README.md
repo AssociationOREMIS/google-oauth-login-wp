@@ -90,6 +90,9 @@ define('WP_DEBUG_LOG', true);
 define('WP_DEBUG_DISPLAY', false);
 ```
 
+### Internal at OREMIS
+Firewall rule : 210580
+
 Check the ```wp-content/debug.log``` file for additional details.
 
 ### ❤️ Credits
