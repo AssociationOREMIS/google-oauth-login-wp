@@ -7,8 +7,9 @@ A WordPress plugin that allows users to log in using their Google accounts via O
 ## 🛠️ Features
 
 - Secure authentication via Google OAuth.
-- Optional automatic WordPress user creation for valid emails.
+- Optional automatic WordPress user creation for allowed emails.
 - Admin page to configure **Client ID** and **Client Secret**.
+- Only @oremis.fr accounts can log in.
 - Modern and user-friendly interface.
 
 ---
@@ -44,6 +45,8 @@ A WordPress plugin that allows users to log in using their Google accounts via O
 2. **Configure the plugin**:
    - Go to `Settings > Google OAuth`.
    - Enter the **Client ID** and **Client Secret** obtained from the Google Cloud Console.
+   - (Optional) Enable automatic user creation.
+   - Only accounts in the @oremis.fr domain are accepted.
    - Click **Save Changes**.
 
 ---
@@ -56,7 +59,8 @@ A WordPress plugin that allows users to log in using their Google accounts via O
 2. **User Login**:
    - Users can click the button to authenticate via Google.
    - If their email matches an existing WordPress user, they will be logged in.
-   - If the email is unknown, the login will fail (no new user will be created automatically).
+   - If automatic creation is enabled, unknown emails will create a new user (subject to @oremis.fr).
+   - If automatic creation is disabled, unknown emails will be refused.
 
 ---
 
